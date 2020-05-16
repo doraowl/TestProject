@@ -16,50 +16,52 @@ from unittest import mock
 
 class SimpleTest(TestCase):
     def setUp(self):
-        #Person.objects.create(id=1,login="TestLogin1", password="TestPassword1")
-        #Person.objects.create(id=2,login="TestLogin2", password="TestPassword2")
-        #Person.objects.create(id=3,login="TestLogin3", password="TestPassword3")
-        #Post.objects.create(id=1,text="TestText1",author_id=1)
-        #Post.objects.create(id=2,text="TestText2",author_id=2)
-        #Post.objects.create(id=3,text="TestText3",author_id=3)
         self.factory = RequestFactory()
-        pass
 
     @classmethod
     def setUpClass(cls):
         super(SimpleTest, cls).setUpClass()
+        Person.objects.all().delete()
+        Post.objects.all().delete()
+        Person.objects.create(login="TestLogin1", password="TestPassword1")
+        Person.objects.create(login="TestLogin2", password="TestPassword2")
+        Person.objects.create(login="TestLogin3", password="TestPassword3")
+        Post.objects.create(text="TestText1",author_id=1)
+        Post.objects.create(text="TestText2",author_id=2)
+        Post.objects.create(text="TestText3",author_id=3)
         django.setup()
         
     def test_getAllPersonsAndPosts(self):
         request=HttpRequest()
         request.method='GET'
-        #request.body=""
         jsonData=json.loads(getAllPersonsAndPosts(request).content)
         self.assertEqual(jsonData['response'], "success")
         self.assertEqual(len(jsonData['query']),3)
 
     def test_getPersonById(self):
         view="getPersonById"
+        person=Person.objects.first()
         data=json.dumps({"id":1})
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         jsonData=json.loads(getPersonById(request).content)
         self.assertEqual(jsonData['response'], "success")
         query=jsonData["query"][0]
-        self.assertEqual(query["id"], 1)
-        self.assertEqual(query["login"], "TestLogin1")
-        self.assertEqual(query["password"], "TestPassword1")
+        self.assertEqual(query["id"], person.id)
+        self.assertEqual(query["login"], person.login)
+        self.assertEqual(query["password"], person.password)
 
     def test_getPostById(self):
         view="getPostById"
-        data=json.dumps({"id":1})
+        post=Post.objects.first()
+        data=json.dumps({"id":post.id})
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         jsonData=json.loads(getPostById(request).content)
         self.assertEqual(jsonData['response'], "success")
         query=jsonData["query"][0]
-        self.assertEqual(query["id"], 1)
-        self.assertEqual(query["text"], "TestText1")
+        self.assertEqual(query["id"], post.id)
+        self.assertEqual(query["text"], post.text)
     def test_createPerson(self):
         view="createPerson"
         data=json.dumps({"login": "newlyCreatedLogin","password": "newlyCreatedPass"})
@@ -73,7 +75,9 @@ class SimpleTest(TestCase):
         self.assertEqual(person.password, "newlyCreatedPass")
     def test_createPost(self):
         view="createPost"
-        data=json.dumps({"text": "newlyCreatedText","author_id": 2})
+        person=Person.objects.first()
+        data=json.dumps({"text": "newlyCreatedText","author_id": person.id})
+
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         jsonData=json.loads(createPost(request).content)
@@ -81,7 +85,7 @@ class SimpleTest(TestCase):
         query=jsonData["query"][0]
         post=Post.objects.get(id=query["id"])
         self.assertEqual(post.text, "newlyCreatedText")
-        self.assertEqual(post.author_id, 2)
+        self.assertEqual(post.author_id, person.id)
     def test_editPerson(self):
         view="editPerson"
         data=json.dumps({"id":1, "login": "editedLogin","password": "editedPass"})
@@ -99,9 +103,10 @@ class SimpleTest(TestCase):
 
     @mock.patch('HttpServer.views.updatePerson')
     def test_editPersonMock(self,updatePersonMock):
-        updatePersonMock.return_value=[{"id":1, "login": "editedLogin","password": "editedPass", "posts":[]}]
+        person=Person.objects.first()
+        updatePersonMock.return_value=[{"id":person.id, "login": "editedLogin","password": "editedPass", "posts":[]}]
         view="editPerson"
-        data=json.dumps({"id":1, "login": "editedLogin","password": "editedPass"})
+        data=json.dumps({"id":person.id, "login": "editedLogin","password": "editedPass"})
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         jsonData=json.loads(editPerson(request).content)
@@ -126,7 +131,8 @@ class SimpleTest(TestCase):
         self.assertEqual(newPost.author_id, 3)
     def test_deletePerson(self):
         view="deletePerson"
-        data=json.dumps({"id":1})
+        person = Person.objects.first()
+        data=json.dumps({"id":person.id})
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         person=Person.objects.get(id=1)
@@ -135,7 +141,8 @@ class SimpleTest(TestCase):
         self.assertEqual(jsonData['response'], "success")
     def test_deletePost(self):
         view="deletePost"
-        data=json.dumps({"id":1})
+        post = Post.objects.first()
+        data=json.dumps({"id":post.id})
         content_type="text/html; charset=utf-8"
         request = self.factory.post(view,data=data,content_type=content_type)
         post=Post.objects.get(id=1)
